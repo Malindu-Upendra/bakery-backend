@@ -7,16 +7,16 @@ const asyncHandler = require("express-async-handler");
 // @route POST /auth
 // @access Public
 const login = asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
+  const { username, password } = req.body;
 
-  if (!email || !password) {
+  if (!username || !password) {
     return res.json({ message: "All fields are required", result: false });
   }
 
-  const foundUser = await User.findOne({ email: email }).exec();
+  const foundUser = await User.findOne({ userName: username }).exec();
 
   if (!foundUser) {
-    return res.json({ message: "Invalid Email", result: false });
+    return res.json({ message: "Invalid Username", result: false });
   }
 
   if (foundUser.status == 0) {
@@ -35,7 +35,7 @@ const login = asyncHandler(async (req, res) => {
     {
       UserInfo: {
         userId: foundUser._id,
-        role: foundUser.roles
+        role: foundUser.role
       },
     },
     process.env.ACCESS_TOKEN_SECRET,
@@ -43,7 +43,7 @@ const login = asyncHandler(async (req, res) => {
   );
 
   const refreshToken = jwt.sign(
-    { email: foundUser.email },
+    { userId: foundUser._id },
     process.env.ACCESS_TOKEN_SECRET,
     { expiresIn: "7d" }
   );
@@ -57,7 +57,7 @@ const login = asyncHandler(async (req, res) => {
   });
 
   // Send accessToken containing username and roles
-  res.json({ accessToken, role: foundUser.roles, result: true });
+  res.json({ accessToken, result: true });
 });
 
 // @desc Refresh
@@ -66,7 +66,7 @@ const login = asyncHandler(async (req, res) => {
 const refresh = (req, res) => {
   const cookies = req.cookies;
 
-  if (!cookies?.jwt) return res.status(401).json({ message: "Unauthorized" });
+  if (!cookies.jwt) return res.status(401).json({ message: "Unauthorized" });
 
   const refreshToken = cookies.jwt;
 
@@ -103,7 +103,7 @@ const refresh = (req, res) => {
 // @access Public - just to clear cookie if exists
 const logout = (req, res) => {
   const cookies = req.cookies;
-  if (!cookies?.jwt) return res.sendStatus(204); //No content
+  if (!cookies.jwt) return res.sendStatus(204); //No content
   res.clearCookie("jwt", { httpOnly: true, sameSite: "None", secure: true });
   res.json({ message: "Cookie cleared" });
 };

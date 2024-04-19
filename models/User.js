@@ -2,6 +2,10 @@ const mongoose = require("mongoose");
 
 const userSchema = new mongoose.Schema(
   {
+    userName: {
+      type: String,
+      required: true,
+    },
     firstName: {
       type: String,
       required: true,
@@ -12,7 +16,6 @@ const userSchema = new mongoose.Schema(
     },
     city: {
       type: String,
-      required: true,
     },
     birthdate: {
       type: Date,
@@ -20,7 +23,6 @@ const userSchema = new mongoose.Schema(
     },
     email: {
       type: String,
-      required: true,
     },
     phone: {
       type: String,
@@ -31,19 +33,21 @@ const userSchema = new mongoose.Schema(
     },
     status: {
       type: Number,
-      default: 0,
+      default: 4,
     },
-    roles: {
-      type: String,
+    role: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'UserRoles'
     },
-    disable: {
-      type: Boolean,
-      default: false
-    }
   },
   {
     timestamps: true,
   }
 );
+
+// statuses
+// -4 Unauthorized
+// 0 Pending
+// 4 Approved
 
 module.exports = mongoose.model("User", userSchema);

@@ -9,13 +9,13 @@ const nodemailer = require("nodemailer");
 // @access Private
 const getAllUsers = asyncHandler(async (req, res) => {
   // Get all users from MongoDB
-  const users = await User.find({ approval: true, deleted: false })
+  const users = await User.find()
     .sort({ createdAt: -1 })
     .select("-password")
     .lean();
 
   // If no users
-  if (!users?.length) {
+  if (!users.length) {
     return res.json({ message: "No users found" });
   }
 
@@ -79,53 +79,45 @@ const emailTesting = asyncHandler(async (req, res) => {
 // @route POST /users
 // @access Private
 const createNewUser = asyncHandler(async (req, res) => {
-  const { firstName, lastName, city, birthdate, email, phone, password, userType } =
+  const { userName, firstName, lastName, city, birthdate, email, phone, password, userType } =
     req.body;
 
   // Confirm data
   if (
+    !userName ||
     !firstName ||
     !lastName ||
-    !city ||
     !birthdate ||
-    !email ||
     !phone ||
-    !password ||
-    !userType
+    !password
   ) {
     return res.json({ message: "All fields are required", result: false });
   }
 
   // Check for duplicate username
-  const duplicate = await User.findOne({ email })
+  const duplicate = await User.findOne({ userName })
     .collation({ locale: "en", strength: 2 })
     .lean()
     .exec();
 
   if (duplicate) {
-    return res.status(409).json({ message: "Duplicate email", result: false });
+    return res.status(409).json({ message: "Duplicate username", result: false });
   }
 
   // Hash password
   const hashedPwd = await bcrypt.hash(password, 10); // salt rounds
 
-  let status = 0;
-
-  if (userType == 'customer') {
-    status = 4
-  }
-
   // Create and store new user
   const user = await User.create({
+    userName,
     firstName,
     lastName,
     city,
     birthdate,
     email,
     phone,
-    roles: userType,
+    role: null,
     password: hashedPwd,
-    status: status,
   });
 
   if (user) {
