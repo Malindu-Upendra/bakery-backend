@@ -26,10 +26,7 @@ const getAllUsers = asyncHandler(async (req, res) => {
 // @route GET /users
 // @access Private
 const getspecificUserDetails = asyncHandler(async (req, res) => {
-  // Get all users from MongoDB
-  const { id } = req.params;
-
-  const user = await User.findById(id).select("-password").lean();
+  const user = await User.findById(req.user).select("-password").lean();
 
   // If no users
   if (!user) {

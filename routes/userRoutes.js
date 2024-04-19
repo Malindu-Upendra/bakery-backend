@@ -1,20 +1,21 @@
 const express = require('express')
 const router = express.Router()
-const usersController = require('../controllers/usersController')
+const usersController = require('../controllers/usersController');
+const verifyJWT = require("../middleware/verifyJWT");
 
 router.route('/')
-    .get(usersController.getAllUsers)
-    .post(usersController.createNewUser)
-    .patch(usersController.updateUser)
+    .get(verifyJWT, usersController.getAllUsers)
+    .post(verifyJWT, usersController.createNewUser)
+    .patch(verifyJWT, usersController.updateUser)
 
-router.route('/:userid').delete(usersController.deleteUser)
+router.route('/:userid').delete(verifyJWT, usersController.deleteUser)
 
-router.route('/emailTesting').get(usersController.emailTesting)
+router.route('/emailTesting').get(verifyJWT, usersController.emailTesting)
 
-router.route('/updateMember/:id').patch(usersController.approveMember)
+router.route('/updateMember/:id').patch(verifyJWT, usersController.approveMember)
 
-router.route('/:id').get(usersController.getspecificUserDetails)
+router.route('/logged-in-user').get(verifyJWT, usersController.getspecificUserDetails)
 
-router.route('/updateSchema').patch(usersController.changeSchema)
+router.route('/updateSchema').patch(verifyJWT, usersController.changeSchema)
 
 module.exports = router
