@@ -4,9 +4,10 @@ const usersController = require('../controllers/usersController');
 const verifyJWT = require("../middleware/verifyJWT");
 
 router.route('/')
-    .get(verifyJWT, usersController.getAllUsers)
     .post(verifyJWT, usersController.createNewUser)
     .patch(verifyJWT, usersController.updateUser)
+
+router.route('/get-all-users').post(verifyJWT, usersController.getAllUsers)
 
 router.route('/:userid').delete(verifyJWT, usersController.deleteUser)
 

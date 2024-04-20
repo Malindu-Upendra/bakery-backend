@@ -8,18 +8,40 @@ const nodemailer = require("nodemailer");
 // @route GET /users
 // @access Private
 const getAllUsers = asyncHandler(async (req, res) => {
-  // Get all users from MongoDB
-  const users = await User.find()
-    .sort({ createdAt: -1 })
+  const dateFields = ["createdAt", "updatedAt"];
+
+  const { currentPage, searchText, status } =
+    req.body;
+
+  const limitEnd = currentPage * 10;
+  const limitStart = limitEnd - 10;
+
+  const filter = {
+    $or: Object.keys(User.schema.paths)
+      .filter(field => !dateFields.includes(field))
+      .map(field => {
+        const fieldDefinition = User.schema.paths[field];
+        if (fieldDefinition.instance === "String") {
+          return { [field]: { $regex: searchText, $options: "i" } };
+        } else {
+          return null;
+        }
+      })
+      .filter(filter => filter !== null)
+  };
+
+  const users = await User.find(filter)
+    .skip(limitStart)
+    .limit(limitEnd)
+    // .sort({ createdAt: -1 })
     .select("-password")
     .lean();
 
-  // If no users
-  if (!users.length) {
-    return res.json({ message: "No users found" });
-  }
+  const totalRecords = await User.countDocuments(filter);
 
-  res.json(users);
+  const totalPages = Math.ceil(totalRecords / 10);
+
+  res.json({ totalRecords, totalPages, users });
 });
 
 // @desc Get specific user details
