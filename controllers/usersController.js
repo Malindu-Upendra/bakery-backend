@@ -98,12 +98,12 @@ const emailTesting = asyncHandler(async (req, res) => {
 // @route POST /users
 // @access Private
 const createNewUser = asyncHandler(async (req, res) => {
-  const { userName, firstName, lastName, city, birthdate, email, phone, password, userType } =
+  const { username, firstName, lastName, city, birthdate, email, phone, password, userType } =
     req.body;
 
   // Confirm data
   if (
-    !userName ||
+    !username ||
     !firstName ||
     !lastName ||
     !birthdate ||
@@ -114,7 +114,7 @@ const createNewUser = asyncHandler(async (req, res) => {
   }
 
   // Check for duplicate username
-  const duplicate = await User.findOne({ userName })
+  const duplicate = await User.findOne({ userName: username })
     .collation({ locale: "en", strength: 2 })
     .lean()
     .exec();
@@ -128,7 +128,7 @@ const createNewUser = asyncHandler(async (req, res) => {
 
   // Create and store new user
   const user = await User.create({
-    userName,
+    userName: username,
     firstName,
     lastName,
     city,
