@@ -7,18 +7,13 @@ const errorHandler = require('./middleware/errorHandler');
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
 const corsOptions = require('./config/corsOptions');
-const connectDB = require('./config/dbConn');
-const mongoose = require('mongoose');
+const sequelize = require('./config/dbConn');
 const bodyParser = require('body-parser');
 const PORT = process.env.PORT || 3500
 
-mongoose.set('strictQuery', false);
-
-connectDB();
-
 app.use(logger);
 
-app.use(cors());
+app.use(cors(corsOptions));
 
 app.use(bodyParser.json({ limit: '25mb' }));
 app.use(bodyParser.urlencoded({ limit: '25mb', extended: true }));
@@ -45,15 +40,17 @@ app.all('*', (req, res) => {
 
 app.use(errorHandler);
 
-mongoose.connection.once('open', () => {
-    console.log('Connected to MongoDB');
-    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-});
-
-mongoose.connection.on('error', err => {
-    console.log(err)
-    logEvents(`${err.no}: ${err.code}\t${err.syscall}\t${err.hostname}`, 'mongoErrLog.log')
-});
-
+sequelize.authenticate()
+    .then(() => {
+        console.log('Connected to MySQL')
+        return sequelize.sync()
+    })
+    .then(() => {
+        app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
+    })
+    .catch(err => {
+        console.error(err)
+        logEvents(`${err.name}: ${err.message}`, 'mysqlErrLog.log')
+    })
 
 module.exports = app;
