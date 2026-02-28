@@ -3,54 +3,44 @@ const asyncHandler = require("express-async-handler");
 const bcrypt = require("bcrypt");
 const generator = require("generate-password");
 const nodemailer = require("nodemailer");
+const { Op } = require("sequelize");
 
 // @desc Get all users
-// @route GET /users
+// @route POST /users/get-all-users
 // @access Private
 const getAllUsers = asyncHandler(async (req, res) => {
-  const dateFields = ["createdAt", "updatedAt"];
-
-  const { currentPage, searchText, status } =
-    req.body;
+  const { currentPage, searchText, status } = req.body;
 
   const limitEnd = currentPage * 10;
   const limitStart = limitEnd - 10;
 
-  const filter = {
-    $or: Object.keys(User.schema.paths)
-      .filter(field => !dateFields.includes(field))
-      .map(field => {
-        const fieldDefinition = User.schema.paths[field];
-        if (fieldDefinition.instance === "String") {
-          return { [field]: { $regex: searchText, $options: "i" } };
-        } else {
-          return null;
-        }
-      })
-      .filter(filter => filter !== null)
-  };
+  const stringFields = ['userName', 'firstName', 'lastName', 'city', 'email', 'phone'];
 
-  const users = await User.find(filter)
-    .skip(limitStart)
-    .limit(limitEnd)
-    // .sort({ createdAt: -1 })
-    .select("-password")
-    .lean();
+  const where = searchText
+    ? { [Op.or]: stringFields.map(field => ({ [field]: { [Op.like]: `%${searchText}%` } })) }
+    : {};
 
-  const totalRecords = await User.countDocuments(filter);
+  const users = await User.findAll({
+    where,
+    offset: limitStart,
+    limit: limitEnd,
+    attributes: { exclude: ['password'] }
+  });
 
+  const totalRecords = await User.count({ where });
   const totalPages = Math.ceil(totalRecords / 10);
 
   res.json({ totalRecords, totalPages, users });
 });
 
 // @desc Get specific user details
-// @route GET /users
+// @route GET /users/logged-in-user
 // @access Private
 const getspecificUserDetails = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user).select("-password").lean();
+  const user = await User.findByPk(req.user, {
+    attributes: { exclude: ['password'] }
+  });
 
-  // If no users
   if (!user) {
     return res.json({ message: "No user found", result: false });
   }
@@ -59,7 +49,7 @@ const getspecificUserDetails = asyncHandler(async (req, res) => {
 });
 
 // @desc test email
-// @route GET /users
+// @route GET /users/emailTesting
 // @access Private
 const emailTesting = asyncHandler(async (req, res) => {
   let transporter = nodemailer.createTransport({
@@ -80,7 +70,7 @@ const emailTesting = asyncHandler(async (req, res) => {
       " Through your donation we have been able to accomplish [goal] and continue working towards help poor people." +
       " You truly make the difference for us, and we are extremely grateful!\n\xA0 \n\xA0Today your donation is going toward [problem]." +
       " If you have specific questions about how your gift is being used or our organization as whole," +
-      " please don’t hesitate to contact Nawoda Jayasinghe through +94 761 123 1234.\n\xA0 \n\xA0" +
+      " please don't hesitate to contact Nawoda Jayasinghe through +94 761 123 1234.\n\xA0 \n\xA0" +
       "Sincerely,\n\xA0" +
       "Siyaptha Oraganization",
   };
@@ -114,10 +104,9 @@ const createNewUser = asyncHandler(async (req, res) => {
   }
 
   // Check for duplicate username
-  const duplicate = await User.findOne({ userName: username })
-    .collation({ locale: "en", strength: 2 })
-    .lean()
-    .exec();
+  const duplicate = await User.findOne({
+    where: { userName: { [Op.like]: username } }
+  });
 
   if (duplicate) {
     return res.status(409).json({ message: "Duplicate username", result: false });
@@ -135,7 +124,7 @@ const createNewUser = asyncHandler(async (req, res) => {
     birthdate,
     email,
     phone,
-    role: null,
+    roleId: null,
     password: hashedPwd,
   });
 
@@ -180,7 +169,7 @@ const updateUser = asyncHandler(async (req, res) => {
     });
 
   // Does the user exist to update?
-  const user = await User.findById(_id).exec();
+  const user = await User.findByPk(_id);
 
   if (!user) {
     return res.json({ message: "User not found", result: false });
@@ -189,10 +178,10 @@ const updateUser = asyncHandler(async (req, res) => {
   user.firstName = firstName;
   user.lastName = lastName;
   user.city = city;
-  user.birthDate = birthDate;
+  user.birthdate = birthDate;
   user.email = email;
   user.phone = phone;
-  user.roles = roles;
+  user.roleId = roles;
   user.active = active;
 
   const updatedUser = await user.save();
@@ -201,7 +190,7 @@ const updateUser = asyncHandler(async (req, res) => {
 });
 
 // @desc Update member
-// @route PATCH /users
+// @route PATCH /users/updateMember/:id
 // @access Private
 const approveMember = asyncHandler(async (req, res) => {
   const { id } = req.params;
@@ -214,13 +203,13 @@ const approveMember = asyncHandler(async (req, res) => {
     });
 
   // Does the user exist to update?
-  const user = await User.findById(id).exec();
+  const user = await User.findByPk(id);
 
   if (!user) {
     return res.status(400).json({ message: "User not found", result: false });
   }
 
-  // // Hash password
+  // Hash password
   const password = generator.generate({
     length: 7,
     numbers: true,
@@ -264,7 +253,7 @@ const approveMember = asyncHandler(async (req, res) => {
         updatedUser.email +
         "\n\xA0\n\xA0" +
         "Membership Level: " +
-        updatedUser.roles +
+        updatedUser.roleId +
         "\n\xA0" +
         "You can log in at http://localhost:3000/login with following username and password\n\xA0" +
         "username: " +
@@ -290,7 +279,7 @@ const approveMember = asyncHandler(async (req, res) => {
 });
 
 // @desc Delete a user
-// @route DELETE /users
+// @route DELETE /users/:userid
 // @access Private
 const deleteUser = asyncHandler(async (req, res) => {
   const { userid } = req.params;
@@ -302,37 +291,25 @@ const deleteUser = asyncHandler(async (req, res) => {
   }
 
   // Does the user exist to delete?
-  const user = await User.findById(userid).exec();
+  const user = await User.findByPk(userid);
 
   if (!user) {
     return res.json({ message: "User not found", result: false });
   }
 
-  // Does the user still have assigned notes?
-  const notes = await Note.find({ user: userid }).lean().exec();
+  user.deleted = true;
+  user.active = false;
+  await user.save();
 
-  if (notes.length > 0) {
-    notes.forEach((note) => {
-      if (!note.completed) {
-        return res.json({
-          message: "User has assigned tasks",
-          result: false,
-        });
-      }
-    });
-  }
-
-  const result = await user.updateOne({ deleted: true, active: false });
-
-  const reply = `Username ${result.firstName} with ID ${result._id} deleted`;
+  const reply = `Username ${user.firstName} with ID ${user.id} deleted`;
 
   res.json({ reply, result: true });
 });
 
 // when need to change the schema
 const changeSchema = asyncHandler(async (req, res) => {
-  const result = await User.updateMany({
-    createdAt: "2023-01-01T08:12:57.227+00:00",
+  const result = await User.update({}, {
+    where: { createdAt: "2023-01-01T08:12:57.227+00:00" }
   });
 
   res.json(result);

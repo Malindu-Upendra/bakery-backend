@@ -13,7 +13,7 @@ const login = asyncHandler(async (req, res) => {
     return res.json({ message: "All fields are required", result: false });
   }
 
-  const foundUser = await User.findOne({ userName: username }).exec();
+  const foundUser = await User.findOne({ where: { userName: username } });
 
   if (!foundUser) {
     return res.json({ message: "Invalid Username", result: false });
@@ -34,8 +34,8 @@ const login = asyncHandler(async (req, res) => {
   const accessToken = jwt.sign(
     {
       UserInfo: {
-        userId: foundUser._id,
-        role: foundUser.role
+        userId: foundUser.id,
+        role: foundUser.roleId
       },
     },
     process.env.ACCESS_TOKEN_SECRET,
@@ -43,7 +43,7 @@ const login = asyncHandler(async (req, res) => {
   );
 
   const refreshToken = jwt.sign(
-    { userId: foundUser._id },
+    { userId: foundUser.id },
     process.env.ACCESS_TOKEN_SECRET,
     { expiresIn: "7d" }
   );
@@ -77,16 +77,16 @@ const refresh = (req, res) => {
       if (err) return res.status(403).json({ message: "Forbidden" });
 
       const foundUser = await User.findOne({
-        username: decoded.username,
-      }).exec();
+        where: { id: decoded.userId },
+      });
 
       if (!foundUser) return res.status(401).json({ message: "Unauthorized" });
 
       const accessToken = jwt.sign(
         {
           UserInfo: {
-            username: foundUser.username,
-            roles: foundUser.roles,
+            username: foundUser.userName,
+            roles: foundUser.roleId,
           },
         },
         process.env.ACCESS_TOKEN_SECRET,
